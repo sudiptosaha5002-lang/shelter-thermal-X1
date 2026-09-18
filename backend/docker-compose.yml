@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: thermal_admin
+      POSTGRES_PASSWORD: securepassword123
+      POSTGRES_DB: shelter_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  thermal-engine:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://thermal_admin:securepassword123@db:5432/shelter_db
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
