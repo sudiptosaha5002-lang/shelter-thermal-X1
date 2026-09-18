@@ -29,27 +29,79 @@
 
 ## 🎯 Overview
 
-The **Shelter Thermal Optimizer** is an advanced tool that allows engineers, architects, and researchers to simulate and optimize the thermal performance of shelters in extreme climates. By leveraging NASA's POWER API for precise climate data and running transient heat flow analysis using finite difference methods, this application helps determine the most energy-efficient materials and structural designs for minimal heating loads.
+The **Shelter Thermal Optimizer** is an advanced tool that allows engineers, architects, and researchers to simulate and optimize the thermal performance of shelters in extreme climates. By leveraging NASA's POWER API for precise climate data and running transient heat flow analysis using finite difference methods, this application helps determine the most energy-efficient materials and structural designs. 
+
+Beyond core physics, the platform features a **Machine Learning Prediction Engine** for instantaneous thermal performance estimates, and a **Multi-Objective Optimization Engine** (utilizing SLSQP and Differential Evolution algorithms) to find the perfect Pareto-optimal balance between heating energy, transport mass, discomfort hours, and material costs.
 
 ---
 
 ## ✨ Key Features
 
-- 🌡️ **Thermal Simulation**: Transient heat flow analysis utilizing the finite difference method.
+- 🧠 **Machine Learning Predictions**: Get instantaneous thermal performance, heat flux, and comfort predictions using trained ML models without waiting for full physics simulations.
+- 🎯 **Multi-Objective Optimization**: Automatically discover the optimal wall layer thicknesses and glazing ratios by balancing competing objectives (Energy vs. Mass vs. Comfort vs. Cost).
+- 📈 **Pareto Front Generation**: Visualize trade-offs between different design priorities across 100+ non-dominated solutions.
+- 🌡️ **Thermal Physics Engine**: Deep transient heat flow analysis utilizing the finite difference method (conductive and convective transfers).
 - 🌍 **Real-time Climate Data**: Direct integration with the NASA POWER API for highly accurate global environmental data.
-- 🏗️ **Material Optimization**: Automated comparison of various structural materials to find the configuration that minimizes heating energy requirements.
 - 🧊 **3D Visualization**: Interactive, browser-based 3D previews of the shelter structures using Three.js.
 - 📊 **Data Visualization**: Rich, dynamic charts for temperature profiles, heating loads, and material comparisons.
 - 👤 **Comfort Analysis**: Built-in PMV/PPD (Predicted Mean Vote / Predicted Percentage of Dissatisfied) thermal comfort assessment.
+- 🎖️ **Mission Presets**: Pre-configured defense and civilian profiles like *Leh Defense Shelter*, *Rapid Airlift Deployment*, and *Armoured Shelter*.
 
 ---
 
 ## 🏗 System Architecture
 
-The project follows a decoupled client-server architecture:
+The system is designed with a decoupled client-server architecture, ensuring clear separation of concerns between computational modeling and user interaction.
 
-- **Frontend (React)**: Handles the UI, 3D rendering (React Three Fiber), and chart visualizations. Communicates with the backend via RESTful APIs.
-- **Backend (FastAPI)**: Serves as the computational engine. Handles the thermal simulation math (NumPy/SciPy), database interactions, and external API requests (NASA POWER).
+```mermaid
+graph TD
+    %% Frontend Subsystem
+    subgraph Frontend [Client - React 18]
+        UI[User Interface / React]
+        ThreeJS[3D Canvas / Three.js]
+        Charts[Visualizations / Chart.js]
+        APIClient[Axios API Client]
+        
+        UI --> ThreeJS
+        UI --> Charts
+        UI --> APIClient
+    end
+
+    %% Backend Subsystem
+    subgraph Backend [Server - FastAPI]
+        API[FastAPI Endpoints]
+        SimulationEngine[Thermal Engine / NumPy + SciPy]
+        NASAService[Climate Service]
+        Comfort[Comfort Analysis / pythermalcomfort]
+        DB[(PostgreSQL Database)]
+
+        API --> SimulationEngine
+        API --> NASAService
+        API --> Comfort
+        SimulationEngine --> DB
+        NASAService --> DB
+    end
+
+    %% External
+    NASA[NASA POWER API]
+
+    %% Connections
+    APIClient -- REST API / JSON --> API
+    NASAService -- HTTP GET --> NASA
+```
+
+### 1. Client-Side (Frontend)
+- **Framework**: React 18 with TypeScript/JavaScript.
+- **State & UI**: Utilizes modern React Hooks for state management. Styled using Tailwind CSS for rapid, responsive design.
+- **3D Visualization Engine**: Uses `@react-three/fiber` and `@react-three/drei` to render an interactive, browser-based 3D model of the shelter, allowing users to visually verify geometries.
+- **Analytics Visualization**: `react-chartjs-2` renders dynamic line and bar charts for displaying simulated temperature profiles (indoor vs outdoor) and energy heating loads over time.
+
+### 2. Server-Side (Backend)
+- **API Layer**: Built with **FastAPI** to provide high-performance, asynchronous REST endpoints with built-in Pydantic data validation.
+- **Computational Core**: A custom finite-difference transient heat flow simulator built on **NumPy** and **SciPy**. This engine calculates the conductive and convective heat transfers hour-by-hour based on material properties (U-value, thermal mass) and external weather conditions.
+- **Climate Data Integration**: Communicates directly with the **NASA POWER API** to fetch historical solar radiation, wind speed, and ambient temperature data for any given GPS coordinate.
+- **Thermal Comfort**: Utilizes `pythermalcomfort` to calculate the Predicted Mean Vote (PMV) and Predicted Percentage of Dissatisfied (PPD) based on ISO 7730 standards.
+- **Persistence**: Structured to use **PostgreSQL** for storing simulation histories, material libraries, and cached climate data to reduce external API rate limiting.
 
 ---
 
@@ -155,13 +207,23 @@ shelter-thermal-optimizer/
 
 Once the backend is running, FastAPI automatically generates interactive API documentation. Visit `http://localhost:8000/docs` to view and test all endpoints.
 
-### Core Endpoints:
-- `GET /api/v1/climate/locations` - Fetch available pre-configured climate locations.
-- `GET /api/v1/climate/data/{location_id}` - Fetch NASA POWER climate data for a specific location.
-- `GET /api/v1/materials/` - Retrieve available building materials and their thermal properties.
-- `POST /api/v1/simulation/run` - Execute a custom thermal simulation.
-- `POST /api/v1/simulation/optimize` - Run the optimization engine across materials.
-- `GET /api/v1/simulation/history` - Fetch previous simulation runs.
+### 🔬 Core Simulation Endpoints:
+- `POST /api/v1/simulate` - Run a transient thermal physics simulation.
+- `GET /api/v1/history` - Fetch previous simulation/optimization runs.
+- `GET /api/v1/climate/locations` - Fetch available climate locations.
+- `GET /api/v1/climate/data/{location_id}` - Fetch NASA POWER climate data.
+
+### 🧠 Machine Learning Endpoints (`/api/v1/ml`):
+- `POST /predict` - Instantaneous ML prediction for thermal performance.
+- `POST /predict/batch` - Batch inference for multiple shelter variations.
+- `GET /compare` - Compare all materials for a given region using the ML model.
+- `GET /model/info` - Fetch accuracy metrics and models utilized (R2, RMSE).
+
+### 🎯 Multi-Objective Optimization Endpoints (`/api/v1/optimization`):
+- `POST /optimize` - Run the SLSQP/Differential Evolution optimization engine.
+- `POST /pareto` - Generate a Pareto front to visualize trade-offs between Energy, Mass, and Comfort.
+- `POST /sensitivity` - Run a parameter sweep for material thickness sensitivity analysis.
+- `GET /presets` - Fetch predefined mission profiles (e.g., *Leh Defense Shelter*).
 
 ---
 
